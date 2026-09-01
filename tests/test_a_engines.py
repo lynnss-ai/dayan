@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from lunar_python import Solar
-from xuanshu.engines import bazi, ziwei, liuyao, qimen, liuren, astrology
+from dayan.engines import bazi, ziwei, liuyao, qimen, liuren, astrology
 
 
 def test_bazi_matches_lunar():

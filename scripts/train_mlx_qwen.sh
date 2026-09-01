@@ -6,8 +6,8 @@ cd "$(dirname "$0")/.."
 
 MODEL="${MODEL:-mlx-community/Qwen3-8B-4bit}"
 CFG="${CFG:-configs/mlx_qwen3_8b_lora.yaml}"
-ADAPTER="adapters/qwen3-8b-xuanshu"
-MERGED="models/qwen3-8b-xuanshu"
+ADAPTER="adapters/qwen3-8b-dayan"
+MERGED="models/qwen3-8b-dayan"
 
 echo "[1/4] 转换 SFT 数据为 mlx-lm chat 格式 ..."
 python3 scripts/convert_to_mlx.py

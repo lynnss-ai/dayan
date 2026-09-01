@@ -10,6 +10,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from ..core import wuxing as W
 from ..core import gua as G
+from ..core.paths import safe_write
 from ..core.registry import REGISTRY, get_engine
 from .prompts import system_prompt, DISCLAIMER
 
@@ -182,11 +183,11 @@ def build_example(key: str, rng: random.Random, use_tool: bool) -> Dict:
             {"role": "user", "content": q},
             {"role": "assistant", "content": None,
              "tool_calls": [{"id": "call_1", "type": "function",
-                             "function": {"name": "xuanshu_cast",
+                             "function": {"name": "dayan_cast",
                                           "arguments": json.dumps(
                                               {"engine": key, "params": kw},
                                               ensure_ascii=False)}}]},
-            {"role": "tool", "name": "xuanshu_cast",
+            {"role": "tool", "name": "dayan_cast",
              "content": json.dumps({"engine": key, "result": result}, ensure_ascii=False)},
             {"role": "assistant", "content": answer}]
     else:
@@ -216,9 +217,11 @@ def generate(domains: Optional[List[str]] = None, per_domain: int = 40, seed: in
     rng.shuffle(train)
     rng.shuffle(val)
     rows = train + val
+    outdir = os.path.realpath(os.path.join(os.path.realpath(os.getcwd()),
+                                           os.path.expanduser(outdir)))
     os.makedirs(outdir, exist_ok=True)
     for name, data in [("sft_train.jsonl", train), ("sft_val.jsonl", val)]:
-        with open(os.path.join(outdir, name), "w", encoding="utf-8") as f:
+        with safe_write(os.path.join(outdir, name)) as f:
             for r in data:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
     return len(train), len(val), count

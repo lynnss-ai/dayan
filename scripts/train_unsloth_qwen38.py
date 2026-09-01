@@ -3,19 +3,19 @@
 train_unsloth_qwen38.py —— 用 Unsloth + QLoRA 在 Qwen3.8-27B 上做多术数玄学 SFT。
 前置：NVIDIA GPU（24GB 起步，32-48GB 更从容），并安装训练依赖：
     pip install unsloth trl transformers datasets torch
-数据：先用 `xuanshu generate --per-domain N` 生成 data/sft_train.jsonl、sft_val.jsonl
+数据：先用 `dayan generate --per-domain N` 生成 data/sft_train.jsonl、sft_val.jsonl
       （覆盖八字/择日/姓名/梅花/灵数/八宅/周易/玄空/六爻/紫微/奇门/六壬/占星/相法/塔罗/灵签）。
 运行：
     python scripts/train_unsloth_qwen38.py \
         --model Qwen/Qwen3.8-27B --train data/sft_train.jsonl \
-        --val data/sft_val.jsonl --out saves/qwen38-xuanshu --epochs 3
+        --val data/sft_val.jsonl --out saves/qwen38-dayan --epochs 3
 说明：
 - Qwen3.8-27B 是「Gated DeltaNet 线性注意力 + Gated Attention」混合架构，
   脚本会打印模型里所有 *proj 模块名，请确认 LoRA 覆盖到线性注意力投影；
   若 Unsloth 版本尚不支持该层，请升级到最新版，或改用 configs/ 下的 LLaMA-Factory 方案。
 - 纯文本任务建议冻结视觉塔（多模态部分）；手相/面相/风水实景等多模态样本另走 VLM SFT。
 - 默认关闭冗长思考：数据已是「简短推导+结论」风格，线上 reasoning_effort 用 medium/low。
-- 工具名统一为 xuanshu_cast(engine, params)，训练后模型学会"先调引擎再解读"。
+- 工具名统一为 dayan_cast(engine, params)，训练后模型学会"先调引擎再解读"。
 """
 import argparse
 import json
@@ -65,7 +65,7 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen3.8-27B")
     ap.add_argument("--train", default="data/sft_train.jsonl")
     ap.add_argument("--val", default="data/sft_val.jsonl")
-    ap.add_argument("--out", default="saves/qwen38-xuanshu")
+    ap.add_argument("--out", default="saves/qwen38-dayan")
     ap.add_argument("--epochs", type=float, default=3.0)
     ap.add_argument("--bs", type=int, default=1)
     ap.add_argument("--grad-accum", type=int, default=8)

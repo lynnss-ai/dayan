@@ -85,7 +85,7 @@ def aggregate(rows):
 def render_markdown(agg):
     if not agg.get("total"):
         return "# 监控日报\n\n（暂无日志记录）\n"
-    L = ["# 玄枢模型监控日报",
+    L = ["# 大衍模型监控日报",
          f"\n区间：{agg['time_from']} → {agg['time_to']}，共 {agg['total']} 次请求\n",
          "| 指标 | 数值 |", "|---|---|",
          f"| 确定性事实命中率 | {agg['fact_hit_rate']} |",

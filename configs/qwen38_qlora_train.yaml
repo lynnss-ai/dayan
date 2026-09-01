@@ -14,7 +14,7 @@ lora_dropout: 0.05
 lora_target: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
 ### 数据（dataset_info.json 放在 data/ 或用 dataset_dir 指定）
 dataset_dir: data
-dataset: xuanshu_sft
+dataset: dayan_sft
 template: qwen
 cutoff_len: 4096
 overwrite_cache: true
@@ -30,7 +30,7 @@ bf16: true
 gradient_checkpointing: true
 logging_steps: 10
 save_steps: 200
-output_dir: saves/qwen38-xuanshu-lora
+output_dir: saves/qwen38-dayan-lora
 report_to: none
 ### 量化（单卡 24GB）
 quantization_bit: 4

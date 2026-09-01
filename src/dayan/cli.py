@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""统一命令行：xuanshu {list,cast,selftest,generate,probe,report}。
+"""统一命令行：dayan {list,cast,selftest,generate,probe,report}。
 示例：
-  xuanshu list
-  xuanshu cast bazi year=1990 month=3 day=15 hour=12 gender=male
-  xuanshu cast qimen dun=阳 ju=1 hour_ganzhi=甲子 --json
-  xuanshu generate --per-domain 40
+  dayan list
+  dayan cast bazi year=1990 month=3 day=15 hour=12 gender=male
+  dayan cast qimen dun=阳 ju=1 hour_ganzhi=甲子 --json
+  dayan generate --per-domain 40
 """
 import argparse
 import json
@@ -13,6 +13,7 @@ import random
 import sys
 
 from .core.registry import REGISTRY, all_engines, get_engine
+from .core.paths import safe_write
 from .sft import generator as gen
 from .observe import canary, metrics as M
 
@@ -36,6 +37,20 @@ def _parse_kv(tokens):
         k, v = tok.split("=", 1)
         raw[k.strip()] = v
     return raw
+
+
+def _resolve_out(path: str) -> str:
+    """输出路径校验：解析后必须位于当前工作目录内，且不能是目录本身。"""
+    root = os.path.realpath(os.getcwd())
+    p = os.path.realpath(os.path.join(root, os.path.expanduser(path)))
+    if p != root and not p.startswith(root + os.sep):
+        raise ValueError(f"输出路径必须位于当前工作目录内：{p}")
+    if os.path.isdir(p):
+        raise ValueError(f"输出路径不能是目录：{p}")
+    parent = os.path.dirname(p)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    return p
 
 
 def _cmd_cast(args) -> int:
@@ -88,15 +103,16 @@ def _cmd_probe(args) -> int:
     elif args.backend == "mlx":
         backend = canary.mlx_backend(args.model)
     else:
-        backend = canary.openai_backend(args.base_url, args.model)
+        backend = canary.openai_backend(args.base_url, args.model,
+                                        allow_public=args.allow_public_url)
     logger = None
     if args.log:
-        os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)
+        args.log = _resolve_out(args.log)
         logger = lambda rec: M.log(args.log, rec)  # noqa: E731
     summary, bad = canary.run_probes(backend, probes, logger)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     if args.badcase:
-        with open(args.badcase, "w", encoding="utf-8") as f:
+        with safe_write(args.badcase) as f:
             for b in bad:
                 f.write(json.dumps(b, ensure_ascii=False) + "\n")
         print(f"坏例 {len(bad)} 条 -> {args.badcase}", file=sys.stderr)
@@ -110,7 +126,7 @@ def _cmd_report(args) -> int:
     agg = M.aggregate(M.load(args.log))
     text = M.render_markdown(agg) if args.markdown else json.dumps(agg, ensure_ascii=False, indent=2)
     if args.out:
-        with open(args.out, "w", encoding="utf-8") as f:
+        with safe_write(args.out) as f:
             f.write(text)
         print(f"报告已写入 {args.out}")
     else:
@@ -119,8 +135,8 @@ def _cmd_report(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="xuanshu",
-                                description="玄枢 xuanshu：多术数确定性规则引擎 + 玄学 SFT 数据工厂")
+    p = argparse.ArgumentParser(prog="dayan",
+                                description="大衍 dayan：多术数确定性规则引擎 + 玄学 SFT 数据工厂")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list", help="列出全部引擎与入参").set_defaults(func=_cmd_list)
     c = sub.add_parser("cast", help="调用某引擎，参数用 key=value")
@@ -140,6 +156,8 @@ def build_parser() -> argparse.ArgumentParser:
     pb = sub.add_parser("probe", help="对拍探针：模型答案 vs 规则引擎真值")
     pb.add_argument("--backend", choices=["echo", "blank", "mlx", "openai"], default="echo")
     pb.add_argument("--base-url", default="http://127.0.0.1:8080/v1")
+    pb.add_argument("--allow-public-url", action="store_true",
+                    help="允许公网模型服务地址（默认仅本机/内网，SSRF 防护）")
     pb.add_argument("--model", default="local")
     pb.add_argument("--engines", default=None, help="逗号分隔，默认全部 16 个")
     pb.add_argument("--n-per-engine", type=int, default=5)

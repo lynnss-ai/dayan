@@ -12,3 +12,4 @@ data/mlx/
 adapters/
 models/
 saves/
+.mimosa/

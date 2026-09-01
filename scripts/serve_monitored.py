@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 serve_monitored.py —— 「规则引擎先算 → 模型解读」的本地监控网关（生产推荐架构）。
-模型不自己排盘：本服务先用 xuanshu 引擎算出确定结果，再把盘交给上游 OpenAI 兼容
+模型不自己排盘：本服务先用 dayan 引擎算出确定结果，再把盘交给上游 OpenAI 兼容
 模型（mlx_lm.server / Ollama / vLLM）做解读；每次请求记录延迟、确定性事实命中、
-免责声明覆盖、异常到 JSONL，可用 `xuanshu report` 出日报。
+免责声明覆盖、异常到 JSONL，可用 `dayan report` 出日报。
 启动（先在另一终端起模型服务，如 python -m mlx_lm.server --model models/... --port 8080）：
     MODEL_BASE_URL=http://127.0.0.1:8080/v1 MODEL_NAME=local \
         python scripts/serve_monitored.py --port 9000 --log evals/requests.jsonl
@@ -17,28 +17,16 @@ serve_monitored.py —— 「规则引擎先算 → 模型解读」的本地监�
 import argparse
 import json
 import os
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from xuanshu.observe import metrics as M
-from xuanshu.observe.gateway import handle_chat
+from dayan.observe import canary
+from dayan.observe import metrics as M
+from dayan.observe.gateway import handle_chat
 
 LOG_PATH = "evals/requests.jsonl"
 
 
-def call_upstream(base_url, model, system, user, timeout=120):
-    body = json.dumps({
-        "model": model, "temperature": 0.4, "max_tokens": 1024,
-        "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": user}]}).encode("utf-8")
-    req = urllib.request.Request(base_url.rstrip("/") + "/chat/completions", data=body,
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    return data["choices"][0]["message"]["content"]
-
-
-def make_handler(base_url, model, log_path):
+def make_handler(upstream, log_path):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code, obj, ctype="application/json"):
             body = (json.dumps(obj, ensure_ascii=False, indent=2)
@@ -69,10 +57,7 @@ def make_handler(base_url, model, log_path):
             try:
                 n = int(self.headers.get("Content-Length", 0))
                 payload = json.loads(self.rfile.read(n).decode("utf-8"))
-                out = handle_chat(
-                    payload,
-                    lambda s, u: call_upstream(base_url, model, s, u),
-                    log_path)
+                out = handle_chat(payload, upstream, log_path)
                 self._send(200, out)
             except Exception as e:  # noqa: BLE001
                 M.log(log_path, {"engine": payload.get("engine", "?"),
@@ -87,13 +72,21 @@ def make_handler(base_url, model, log_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=9000)
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="监听地址，默认仅本机；确需局域网访问时再改为 0.0.0.0")
     ap.add_argument("--log", default=LOG_PATH)
     ap.add_argument("--base-url", default=os.environ.get("MODEL_BASE_URL", "http://127.0.0.1:8080/v1"))
     ap.add_argument("--model", default=os.environ.get("MODEL_NAME", "local"))
+    ap.add_argument("--allow-public-url", action="store_true",
+                    help="允许公网模型服务地址（默认仅本机/内网，SSRF 防护）")
     args = ap.parse_args()
-    srv = ThreadingHTTPServer(("0.0.0.0", args.port),
-                              make_handler(args.base_url, args.model, args.log))
-    print(f"玄枢监控网关 :{args.port}，上游 {args.base_url}，日志 {args.log}")
+    # 复用 canary 的 OpenAI 后端：单点实现 + 内置地址校验（http(s)、默认仅本机/内网）
+    backend = canary.openai_backend(args.base_url, args.model,
+                                    allow_public=args.allow_public_url)
+    upstream = lambda s, u: backend(s, u, None)  # noqa: E731
+    srv = ThreadingHTTPServer((args.host, args.port),
+                              make_handler(upstream, args.log))
+    print(f"大衍监控网关 {args.host}:{args.port}，上游 {args.base_url}，日志 {args.log}")
     srv.serve_forever()
 
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import pytest
-from xuanshu.engines import physiognomy, oracle
+from dayan.engines import physiognomy, oracle
 
 
 def test_face_rules():

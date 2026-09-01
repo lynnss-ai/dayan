@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from xuanshu.core import wuxing as W
+from dayan.core import wuxing as W
 
 
 def test_shishen():

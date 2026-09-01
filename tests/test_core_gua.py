@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from xuanshu.core import gua as G
+from dayan.core import gua as G
 
 
 def test_64_lookup():

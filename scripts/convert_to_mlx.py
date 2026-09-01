@@ -17,6 +17,10 @@ mlx-lm（Apple Silicon 原生）LoRA 训练读取目录下的 train.jsonl / vali
 import argparse
 import json
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+from dayan.core.paths import safe_write  # noqa: E402
 
 
 def normalize(messages):
@@ -38,7 +42,7 @@ def normalize(messages):
 def convert_file(src, dst):
     n = 0
     with open(src, "r", encoding="utf-8") as f, \
-            open(dst, "w", encoding="utf-8") as w:
+            safe_write(dst) as w:
         for line in f:
             line = line.strip()
             if not line:

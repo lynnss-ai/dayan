@@ -24,4 +24,4 @@ learning_rate: 1.0e-4
 steps_per_report: 10
 steps_per_eval: 100
 save_every: 100
-adapter_path: adapters/qwen3-8b-xuanshu
+adapter_path: adapters/qwen3-8b-dayan

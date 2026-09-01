@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from xuanshu.engines import (almanac, name_fivegrid, meihua, numerology,
+from dayan.engines import (almanac, name_fivegrid, meihua, numerology,
                              bazhai, zhouyi, xuankong, tarot)
 
 

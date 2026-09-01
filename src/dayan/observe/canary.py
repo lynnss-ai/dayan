@@ -12,6 +12,7 @@ backend 可替换：
 import json
 import random
 import time
+import urllib.parse
 import urllib.request
 
 from ..core.registry import get_engine
@@ -49,8 +50,30 @@ def blank_backend(system, user, gold):
     return ""
 
 
+def check_model_url(base_url, allow_public=False):
+    """模型服务地址校验：仅 http(s)；默认仅允许本机/内网地址（SSRF 防护）。"""
+    u = urllib.parse.urlparse(base_url.rstrip("/"))
+    if u.scheme not in ("http", "https"):
+        raise ValueError(f"base_url 仅支持 http/https：{base_url}")
+    if allow_public:
+        return
+    host = u.hostname or ""
+    try:
+        import ipaddress
+        ip = ipaddress.ip_address(host)
+        ok = ip.is_loopback or ip.is_private
+    except ValueError:
+        ok = host == "localhost"
+    if not ok:
+        raise ValueError(f"出于 SSRF 防护，默认仅允许本机/内网模型服务地址；"
+                         f"公网地址请显式传 allow_public=True：{base_url}")
+
+
 def openai_backend(base_url="http://127.0.0.1:8080/v1", model="local",
-                   temperature=0.0, max_tokens=1024, timeout=120):
+                   temperature=0.0, max_tokens=1024, timeout=120,
+                   allow_public=False):
+    check_model_url(base_url, allow_public)
+
     def _call(system, user, gold):
         body = json.dumps({
             "model": model, "temperature": temperature, "max_tokens": max_tokens,

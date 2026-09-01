@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 
-from xuanshu.observe import canary, metrics as M, facts as F
+from dayan.observe import canary, metrics as M, facts as F
 
 
 def test_fact_extractors_self_consistent():
@@ -52,7 +52,7 @@ def test_norm_ignores_spaces():
 
 def test_monitored_gateway_core():
     import tempfile
-    from xuanshu.observe.gateway import handle_chat
+    from dayan.observe.gateway import handle_chat
     with tempfile.TemporaryDirectory() as d:
         logp = os.path.join(d, "req.jsonl")
         # 假上游：把引擎给的盘原样复述并加参考语（模拟答对）

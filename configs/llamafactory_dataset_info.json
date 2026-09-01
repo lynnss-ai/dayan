@@ -1,5 +1,5 @@
 {
-  "xuanshu_sft": {
+  "dayan_sft": {
     "file_name": "sft_train.jsonl",
     "formatting": "sharegpt",
     "columns": {
@@ -16,7 +16,7 @@
     },
     "template": "qwen"
   },
-  "xuanshu_sft_val": {
+  "dayan_sft_val": {
     "file_name": "sft_val.jsonl",
     "formatting": "sharegpt",
     "columns": { "messages": "messages" },
