@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xuanshu-sft"
+version = "0.4.0"
+description = "玄枢 xuanshu：多术数确定性规则引擎（八字/择日/姓名/梅花/灵数/八宅/周易/玄空/六爻/紫微/奇门/六壬/占星/相法/塔罗/灵签）+ 玄学 SFT 数据工厂，支持 NVIDIA(Unsloth) 与 Apple Silicon(MLX) 训练"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["lunar-python==1.4.4"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+astro = ["pyswisseph"]
+mac = ["mlx-lm"]
+train = ["unsloth", "trl>=0.12", "transformers>=4.51", "datasets>=2.20", "torch"]
+
+[project.scripts]
+xuanshu = "xuanshu.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

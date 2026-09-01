@@ -1,0 +1,27 @@
+# mlx-lm LoRA 配置 —— Apple M4 24GB 统一内存 + Qwen3-8B-4bit
+# 启动：python -m mlx_lm.lora --config configs/mlx_qwen3_8b_lora.yaml
+# 说明：键名对应 mlx-lm 命令行参数；若你装的版本提示某参数不存在，
+#       以 `python -m mlx_lm.lora --help` 为准（旧版 max_seq_length 叫 seq_length）。
+
+model: mlx-community/Qwen3-8B-4bit
+train: true
+data: data/mlx
+fine_tune_type: lora
+
+# 只对后 16 层挂 LoRA（mlx-lm 默认作用于 q_proj/v_proj），24GB 足够且更快
+num_layers: 16
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# M4 24GB 稳妥设置：微 batch=1 + 梯度累积 8（等效 batch 8）
+batch_size: 1
+grad_accumulate: 8
+max_seq_length: 2048
+
+iters: 1000
+learning_rate: 1.0e-4
+steps_per_report: 10
+steps_per_eval: 100
+save_every: 100
+adapter_path: adapters/qwen3-8b-xuanshu

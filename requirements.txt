@@ -1,0 +1,5 @@
+lunar-python==1.4.4
+# 可选：西方占星自行计算行星位置时安装
+# pyswisseph
+# 训练阶段（另见 scripts/train_unsloth_qwen38.py）
+# unsloth; trl>=0.12; transformers>=4.51; datasets>=2.20; torch

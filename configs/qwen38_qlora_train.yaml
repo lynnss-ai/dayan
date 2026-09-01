@@ -1,0 +1,37 @@
+# LLaMA-Factory QLoRA 配置（Qwen3.8-27B 多术数玄学 SFT）
+# 用法：llamafactory-cli train configs/qwen38_qlora_train.yaml
+### 模型
+model_name_or_path: Qwen/Qwen3.8-27B
+trust_remote_code: true
+### 方法
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+# 覆盖标准注意力 + 混合架构中的线性注意力投影（DeltaNet），按实际模块名增删
+lora_target: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
+### 数据（dataset_info.json 放在 data/ 或用 dataset_dir 指定）
+dataset_dir: data
+dataset: xuanshu_sft
+template: qwen
+cutoff_len: 4096
+overwrite_cache: true
+preprocessing_num_workers: 8
+### 训练
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+bf16: true
+gradient_checkpointing: true
+logging_steps: 10
+save_steps: 200
+output_dir: saves/qwen38-xuanshu-lora
+report_to: none
+### 量化（单卡 24GB）
+quantization_bit: 4
+quantization_method: bitsandbytes
