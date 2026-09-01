@@ -5,8 +5,8 @@
 import os
 
 
-def safe_write(path: str, encoding: str = "utf-8"):
-    """校验并打开输出文件，返回写句柄（配合 with 使用）。"""
+def resolve_out(path: str) -> str:
+    """校验并返回绝对化输出路径：必须位于当前工作目录内、不能是目录本身。"""
     root = os.path.realpath(os.getcwd())
     p = os.path.realpath(os.path.join(root, os.path.expanduser(path)))
     if p != root and not p.startswith(root + os.sep):
@@ -16,5 +16,11 @@ def safe_write(path: str, encoding: str = "utf-8"):
     parent = os.path.dirname(p)
     if parent:
         os.makedirs(parent, exist_ok=True)
+    return p
+
+
+def safe_write(path: str, encoding: str = "utf-8"):
+    """校验并打开输出文件，返回写句柄（配合 with 使用）。"""
+    p = resolve_out(path)
     fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
     return os.fdopen(fd, "w", encoding=encoding)

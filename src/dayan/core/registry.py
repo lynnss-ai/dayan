@@ -10,6 +10,7 @@ maturity 成熟度说明（诚实标注，便于后续补齐）：
 """
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
+import warnings
 
 REGISTRY: Dict[str, "EngineSpec"] = {}
 
@@ -44,9 +45,13 @@ class EngineSpec:
                 raise ValueError(f"引擎 {self.key} 缺少必填参数 {name}")
             else:
                 out[name] = spec.default
-        # 允许引擎接收未在 spec 中声明的额外参数（原样透传字符串）
+        # 允许引擎接收未在 spec 中声明的额外参数（原样透传字符串），
+        # 但显式告警：拼错参数名不应静默落到默认值
         for k, v in raw.items():
             if k not in out:
+                warnings.warn(f"引擎 {self.key} 收到未声明参数 {k}={v!r}"
+                              f"（已按字符串透传；可用 --strict 改为报错）",
+                              stacklevel=2)
                 out[k] = v
         return out
 

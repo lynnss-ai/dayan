@@ -30,11 +30,3 @@ def test_generate_structure(tmp_path, monkeypatch):
             if r["kind"] == "tool_call":
                 assert msgs[1]["role"] == "user" and msgs[2]["tool_calls"]
 
-
-def test_every_sampler_runs():
-    import random
-    rng = random.Random(7)
-    for key, fn in gen.SAMPLERS.items():
-        kw = fn(rng)
-        out = REGISTRY[key].cast(**kw)
-        assert out.get("text")

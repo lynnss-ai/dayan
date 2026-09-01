@@ -10,7 +10,7 @@ def test_fact_extractors_self_consistent():
     """用引擎标准答案自问自答，所有确定性事实必须 100% 命中（验证事实选取无误）。"""
     probes = canary.build_probes(n_per_engine=3, seed=999)
     summary, bad = canary.run_probes(canary.echo_backend, probes)
-    assert summary["n"] == 48
+    assert summary["total"] == 48
     assert summary["fact_hit_rate"] == 1.0, [(b["engine"], b["missing"]) for b in bad]
     assert summary["full_match_rate"] == 1.0
 

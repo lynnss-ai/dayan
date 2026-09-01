@@ -37,6 +37,11 @@ def true_solar_time(subj: Subject) -> Tuple[int, int, int, int, int]:
     return adj.year, adj.month, adj.day, adj.hour, adj.minute
 
 
+def hour_zhi_index(hour: int) -> int:
+    """公历小时 → 时支序号（子=0；23 时属次日子时，取模归子）。"""
+    return ((hour + 1) // 2) % 12
+
+
 def to_lunar(subj: Subject):
     """Subject → (lunar, eightchar, gender_code)，已做可选真太阳时校正。"""
     y, mo, d, h, mi = true_solar_time(subj)

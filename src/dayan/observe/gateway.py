@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""监控网关核心：规则引擎先算 → 调上游模型解读 → 事实对拍 → 留痕。"""
-import time
-
+"""监控网关核心：规则引擎先算 → 调上游模型解读 → 事实对拍 → 留痕。
+单条评估（计时/事实比对/免责检查/记录字段）统一走 observe.evaluation，
+与离线对拍探针共享同一套口径。"""
 from ..core.registry import get_engine
 from ..sft.prompts import system_prompt
-from . import facts as F
-from . import canary
 from . import metrics as M
+from .evaluation import evaluate_one
 
 
 def handle_chat(payload, upstream, log_path="evals/requests.jsonl"):
@@ -16,18 +15,14 @@ def handle_chat(payload, upstream, log_path="evals/requests.jsonl"):
     question = payload.get("question", "请按排盘结果解读")
     result = get_engine(engine).cast(**params)
     system = system_prompt(engine)
-    user = (f"{question}\n\n【规则引擎排盘结果（以此为准，勿自行重算）】\n"
-            f"{result['text']}")
-    t0 = time.time()
-    answer = upstream(system, user)
-    latency = round((time.time() - t0) * 1000, 1)
-    hit, tot, missing = F.check_answer(engine, params, result, answer)
-    disc = canary.has_disclaimer(answer)
-    rec = M.log(log_path, {
-        "engine": engine, "ok": True, "latency_ms": latency,
-        "hit_facts": hit, "n_facts": tot, "has_disclaimer": disc,
-        "flagged": tot > 0 and hit < tot,
-        "note": "事实缺失:" + ",".join(missing) if missing else ""})
-    return {"engine": engine, "answer": answer, "hit_facts": hit, "n_facts": tot,
-            "missing_facts": missing, "has_disclaimer": disc,
-            "latency_ms": latency, "log": rec}
+
+    def _backend(s, q, gold):
+        user = (f"{q}\n\n【规则引擎排盘结果（以此为准，勿自行重算）】\n{gold}")
+        return upstream(s, user)
+
+    rec, answer = evaluate_one(engine, params, result, question, system, _backend,
+                               logger=lambda r: M.log(log_path, r))
+    return {"engine": engine, "answer": answer, "hit_facts": rec["hit_facts"],
+            "n_facts": rec["n_facts"], "missing_facts": rec["missing"],
+            "has_disclaimer": rec["has_disclaimer"],
+            "latency_ms": rec["latency_ms"], "log": rec}

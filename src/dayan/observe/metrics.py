@@ -7,15 +7,19 @@
 import json
 import os
 import statistics
+import threading
 from datetime import datetime
+
+_LOG_LOCK = threading.Lock()  # ThreadingHTTPServer 下多线程并发落盘防交错
 
 
 def log(path, record):
     rec = {"ts": datetime.now().isoformat(timespec="seconds")}
     rec.update(record)
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    with _LOG_LOCK:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return rec
 
 
@@ -70,9 +74,11 @@ def aggregate(rows):
         b["p50_ms"] = round(percentile(b["lat"], 0.5), 1)
         b["p95_ms"] = round(percentile(b["lat"], 0.95), 1)
         del b["lat"]
+    ts = [r.get("ts") for r in rows if r.get("ts")]
     return {
         "total": n,
-        "time_from": rows[0].get("ts"), "time_to": rows[-1].get("ts"),
+        "time_from": ts[0] if ts else "-",
+        "time_to": ts[-1] if ts else "-",
         "fact_hit_rate": round(fact_hit / fact_tot, 4) if fact_tot else None,
         "full_match_rate": round(full / n_with_facts, 4) if n_with_facts else None,
         "disclaimer_rate": round(disc / n, 4),

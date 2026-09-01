@@ -45,6 +45,9 @@ _GUA_LOOKUP: Dict[str, Tuple[str, str]] = {}
 for _u, row in NAME64.items():
     for _l, _name in row.items():
         _GUA_LOOKUP[_name] = (_u, _l)
+# 爻型 → 卦名（模块加载时预计算，排卦热路径免重建）
+_LINES_TO_TRIGRAM: Dict[Tuple[int, ...], str] = {tuple(v): k
+                                                 for k, v in TRIGRAM_LINES.items()}
 
 
 def lines_of(upper: str, lower: str) -> List[int]:
@@ -55,8 +58,7 @@ def lines_of(upper: str, lower: str) -> List[int]:
 def split_trigrams(lines: List[int]) -> Tuple[str, str]:
     """由六爻反推 (上卦, 下卦)。"""
     low, up = lines[:3], lines[3:]
-    inv = {tuple(v): k for k, v in TRIGRAM_LINES.items()}
-    return inv[tuple(up)], inv[tuple(low)]
+    return _LINES_TO_TRIGRAM[tuple(up)], _LINES_TO_TRIGRAM[tuple(low)]
 
 
 def gua_name(upper: str, lower: str) -> str:
@@ -79,9 +81,8 @@ def zong_gua(lines: List[int]) -> str:
 
 def hu_gua(lines: List[int]) -> Tuple[str, str]:
     """互卦：下互为 2,3,4 爻，上互为 3,4,5 爻（爻位 0 起）。"""
-    inv = {tuple(v): k for k, v in TRIGRAM_LINES.items()}
-    lower = inv[tuple(lines[1:4])]
-    upper = inv[tuple(lines[2:5])]
+    lower = _LINES_TO_TRIGRAM[tuple(lines[1:4])]
+    upper = _LINES_TO_TRIGRAM[tuple(lines[2:5])]
     return upper, lower
 
 

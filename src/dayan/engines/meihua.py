@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 from ..core import wuxing as W
 from ..core import gua as G
-from ..core.lunar_cal import lunar_from_ymd
+from ..core.lunar_cal import hour_zhi_index, lunar_from_ymd
 from ..core.registry import register, InputSpec
 
 
@@ -16,11 +16,6 @@ def _mod8(n: int) -> int:
 def _mod6(n: int) -> int:
     r = n % 6
     return 6 if r == 0 else r
-
-
-def hour_zhi_index(hour: int) -> int:
-    """公历小时 → 时支序号（子=0）。"""
-    return ((hour + 1) // 2) % 12
 
 
 def _build(upper: str, lower: str, dong_pos: int, month_wx: Optional[str]) -> Dict:

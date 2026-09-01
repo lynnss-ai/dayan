@@ -1,26 +1,26 @@
 # -*- coding: utf-8 -*-
 """对拍探针（canary）：用训练未见过的留出随机样本问模型，再与规则引擎真值比对。
 离线评估与线上巡检共用同一套逻辑：
-  probes = build_probes(...)           # 造留出题目（含 engine/kw/问题/事实/标准答案）
-  result = run_probes(backend, probes) # backend(system, user, gold)->answer 字符串
+  probes = build_probes(...)              # 造留出题目（含 engine/kw/问题/事实/标准答案）
+  summary, bad = run_probes(backend, ...) # backend(system, user, gold)->answer 字符串
 backend 可替换：
   echo_backend   直接返回引擎标准答案，用于自检评估器（事实命中率应为 100%）
   blank_backend  返回空串，用于对照（应为 0%）
   mlx_backend    Apple MLX 本地加载（懒加载，仅 Mac）
   openai_backend 请求 OpenAI 兼容服务（mlx_lm.server / Ollama / vLLM）
+单条评估逻辑与免责判定统一在 observe.evaluation，汇总统一在 observe.metrics。
 """
 import json
 import random
-import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 from ..core.registry import get_engine
 from ..sft.generator import SAMPLERS, ASK, human_args
 from ..sft.prompts import system_prompt
 from . import facts as F
-
-DISCLAIMER_MARKS = ("参考", "不构成", "娱乐", "传统文化")
+from .evaluation import DISCLAIMER_MARKS, evaluate_one, has_disclaimer  # noqa: F401
 
 
 def build_probes(engines=None, n_per_engine=5, seed=999):
@@ -106,68 +106,24 @@ def mlx_backend(model_path, max_tokens=1024):
     return _call
 
 
-def has_disclaimer(text):
-    return any(m in text for m in DISCLAIMER_MARKS)
+def run_probes(backend, probes, logger=None, workers=1):
+    """批量对拍：逐条（或并发 workers 路）评估，返回 (汇总指标, 坏例列表)。
 
+    汇总直接复用 metrics.aggregate，与线上网关同一套口径；
+    workers>1 时结果按探针顺序回收，落盘顺序与探针顺序一致。
+    """
+    from . import metrics as M
 
-def run_probes(backend, probes, logger=None):
-    rows, badcases = [], []
-    for p in probes:
-        t0 = time.time()
-        try:
-            ans = backend(p["system"], p["question"], p["gold"])
-            ok, err = True, ""
-        except Exception as e:  # noqa: BLE001
-            ans, ok, err = "", False, repr(e)
-        lat = round((time.time() - t0) * 1000, 1)
-        hit, tot, missing = F.check_answer(p["engine"], p["kw"], p["result"], ans)
-        rec = {"engine": p["engine"], "ok": ok, "err": err,
-               "latency_ms": lat, "hit_facts": hit, "n_facts": tot,
-               "full_match": tot > 0 and hit == tot,
-               "has_disclaimer": has_disclaimer(ans),
-               "question": p["question"], "missing": missing,
-               "answer": ans if not ok or missing else ""}
-        rows.append(rec)
-        if logger:
-            logger({"engine": p["engine"], "ok": ok, "latency_ms": lat,
-                    "hit_facts": hit, "n_facts": tot,
-                    "has_disclaimer": rec["has_disclaimer"],
-                    "flagged": bool(err) or (tot > 0 and hit < tot),
-                    "note": err})
-        if not ok or missing:
-            badcases.append(rec)
-    return summarize(rows), badcases
+    def _one(p):
+        rec, _ = evaluate_one(p["engine"], p["kw"], p["result"], p["question"],
+                              p["system"], backend, logger=logger,
+                              record_answer=True)
+        return rec
 
-
-def summarize(rows):
-    n = len(rows)
-    fact_tot = sum(r["n_facts"] for r in rows)
-    fact_hit = sum(r["hit_facts"] for r in rows)
-    return {
-        "n": n, "ok_rate": round(sum(r["ok"] for r in rows) / n, 4) if n else 0,
-        "fact_hit_rate": round(fact_hit / fact_tot, 4) if fact_tot else None,
-        "full_match_rate": round(sum(r["full_match"] for r in rows) / n, 4) if n else 0,
-        "disclaimer_rate": round(sum(r["has_disclaimer"] for r in rows) / n, 4) if n else 0,
-        "p95_ms": round(_p95([r["latency_ms"] for r in rows]), 1),
-        "by_engine": _by_engine(rows)}
-
-
-def _p95(xs):
-    if not xs:
-        return 0
-    xs = sorted(xs)
-    return xs[min(len(xs) - 1, int(round(0.95 * (len(xs) - 1))))]
-
-
-def _by_engine(rows):
-    out = {}
-    for r in rows:
-        b = out.setdefault(r["engine"], {"n": 0, "hit": 0, "tot": 0, "full": 0})
-        b["n"] += 1
-        b["hit"] += r["hit_facts"]
-        b["tot"] += r["n_facts"]
-        b["full"] += int(r["full_match"])
-    for b in out.values():
-        b["fact_hit_rate"] = round(b["hit"] / b["tot"], 4) if b["tot"] else None
-        b["full_match_rate"] = round(b["full"] / b["n"], 4)
-    return out
+    if workers and workers > 1:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            rows = list(ex.map(_one, probes))
+    else:
+        rows = [_one(p) for p in probes]
+    badcases = [r for r in rows if not r["ok"] or r["missing"]]
+    return M.aggregate(rows), badcases

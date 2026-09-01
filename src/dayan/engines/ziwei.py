@@ -6,9 +6,8 @@
 from typing import Dict
 
 from ..core import wuxing as W
-from ..core.lunar_cal import lunar_from_ymd
+from ..core.lunar_cal import hour_zhi_index, lunar_from_ymd
 from ..core.registry import register, InputSpec
-from .meihua import hour_zhi_index
 
 JU_OF_WX = {"水": 2, "木": 3, "金": 4, "土": 5, "火": 6}
 # 紫微地支序号 → 天府地支序号（以寅申线镜像，寅申同宫）

@@ -13,7 +13,7 @@ import random
 import sys
 
 from .core.registry import REGISTRY, all_engines, get_engine
-from .core.paths import safe_write
+from .core.paths import resolve_out, safe_write
 from .sft import generator as gen
 from .observe import canary, metrics as M
 
@@ -39,23 +39,14 @@ def _parse_kv(tokens):
     return raw
 
 
-def _resolve_out(path: str) -> str:
-    """输出路径校验：解析后必须位于当前工作目录内，且不能是目录本身。"""
-    root = os.path.realpath(os.getcwd())
-    p = os.path.realpath(os.path.join(root, os.path.expanduser(path)))
-    if p != root and not p.startswith(root + os.sep):
-        raise ValueError(f"输出路径必须位于当前工作目录内：{p}")
-    if os.path.isdir(p):
-        raise ValueError(f"输出路径不能是目录：{p}")
-    parent = os.path.dirname(p)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    return p
-
-
 def _cmd_cast(args) -> int:
     spec = get_engine(args.engine)
     raw = _parse_kv(args.params)
+    if args.strict:
+        unknown = set(raw) - {s.name for s in spec.inputs}
+        if unknown:
+            raise ValueError(f"引擎 {args.engine} 不支持参数：{sorted(unknown)}，"
+                             f"可用：{[s.name for s in spec.inputs]}（--strict 下报错）")
     kwargs = spec.coerce(raw)
     result = spec.cast(**kwargs)
     if args.json:
@@ -107,9 +98,9 @@ def _cmd_probe(args) -> int:
                                         allow_public=args.allow_public_url)
     logger = None
     if args.log:
-        args.log = _resolve_out(args.log)
+        args.log = resolve_out(args.log)
         logger = lambda rec: M.log(args.log, rec)  # noqa: E731
-    summary, bad = canary.run_probes(backend, probes, logger)
+    summary, bad = canary.run_probes(backend, probes, logger, workers=args.workers)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     if args.badcase:
         with safe_write(args.badcase) as f:
@@ -143,6 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("engine")
     c.add_argument("params", nargs="*", help="key=value ...")
     c.add_argument("--json", action="store_true")
+    c.add_argument("--strict", action="store_true",
+                   help="未知入参直接报错（默认仅告警，防拼错参数静默走默认值）")
     c.set_defaults(func=_cmd_cast)
     sub.add_parser("selftest", help="对每个引擎做一次确定性冒烟").set_defaults(func=_cmd_selftest)
     g = sub.add_parser("generate", help="批量生成多术数 SFT JSONL")
@@ -164,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--seed", type=int, default=999)
     pb.add_argument("--log", default=None, help="逐条指标落此 JSONL")
     pb.add_argument("--badcase", default=None, help="错例输出 JSONL")
+    pb.add_argument("--workers", type=int, default=1,
+                    help="并发请求数；openai 后端建议 4-8（echo/blank/mlx 保持 1）")
     pb.set_defaults(func=_cmd_probe)
     rp = sub.add_parser("report", help="聚合请求日志出监控日报")
     rp.add_argument("--log", required=True)

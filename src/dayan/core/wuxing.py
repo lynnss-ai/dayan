@@ -28,8 +28,7 @@ HIDE: Dict[str, List[str]] = {
 WUXING: List[str] = ["木", "火", "土", "金", "水"]
 SHENG: Dict[str, str] = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
 KE: Dict[str, str] = {"木": "土", "土": "水", "水": "火", "火": "金", "金": "木"}
-# 旺相休囚死：以月令为我
-WANGXIANG: Dict[Tuple[str, str], str] = {}
+# 旺相休囚死：以月令为我，见 wangxiang_state()
 
 # ---------- 六十甲子纳音 ----------
 _NAYIN_SEQ: List[str] = [
@@ -38,6 +37,7 @@ _NAYIN_SEQ: List[str] = [
     "山下火", "平地木", "壁上土", "金箔金", "覆灯火", "天河水", "大驿土", "钗钏金",
     "桑柘木", "大溪水", "沙中土", "天上火", "石榴木", "大海水"]
 JIAZI: List[str] = [GAN[i % 10] + ZHI[i % 12] for i in range(60)]
+_JIAZI_INDEX: Dict[str, int] = {jz: i for i, jz in enumerate(JIAZI)}
 NAYIN: Dict[str, str] = {JIAZI[i]: _NAYIN_SEQ[i // 2] for i in range(60)}
 # 纳音五行（取末字）
 NAYIN_WX: Dict[str, str] = {k: v[-1] for k, v in NAYIN.items()}
@@ -129,12 +129,11 @@ def hour_gan(day_gan: str, hour_zhi: str) -> str:
 
 
 def jiazi_index(gan: str, zhi: str) -> int:
-    """六十甲子序号 0..59。"""
-    gi, zi = GAN.index(gan), ZHI.index(zhi)
-    for i in range(60):
-        if i % 10 == gi and i % 12 == zi:
-            return i
-    raise ValueError(f"非法干支 {gan}{zhi}")
+    """六十甲子序号 0..59（预计算表直查）。"""
+    try:
+        return _JIAZI_INDEX[gan + zhi]
+    except KeyError:
+        raise ValueError(f"非法干支 {gan}{zhi}") from None
 
 
 # ---------- 天干合化 / 地支刑冲合害 ----------
