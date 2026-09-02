@@ -66,9 +66,9 @@ print(chart["text"])
 | `bazhai` | Eight Mansions Feng Shui | S | complete | Life gua, East/West four groups, eight-direction auspiciousness |
 | `zhouyi` | Zhouyi Hexagrams | S | complete | Palace, shi/ying lines, inverse/opposite/nuclear/changed hexagrams |
 | `xuankong` | Xuan Kong Flying Stars | A | complete | Three periods nine cycles, chart casting for period/mountain/facing stars |
-| `liuyao` | Liu Yao Na Jia | A | core | Hexagram assembly, na jia, shi/ying, six relatives & six animals, changed hexagram (interpretation left to the model) |
-| `ziwei` | Zi Wei Dou Shu | A | core | Life/body palaces, five-element bureau, 14 major stars, four transformations, major limits |
-| `qimen` | Qi Men Dun Jia | A | core | Heaven/earth plates, nine stars, eight doors, eight gods, duty star & door (given dun/ju) |
+| `liuyao` | Liu Yao Na Jia | A | core | Hexagram assembly, na jia, shi/ying, six relatives & six animals, void (xun kong), changed hexagram (interpretation left to the model) |
+| `ziwei` | Zi Wei Dou Shu | A | core | Life/body palaces, five-element bureau, 14 major stars, 6 auspicious stars + Lu Cun/Qing Yang/Tuo Luo, four transformations, major limits |
+| `qimen` | Qi Men Dun Jia | A | core | Auto ju resolution via Chai Bu (or manual dun/ju) + hour pillar; heaven/earth plates, nine stars, eight doors, eight gods, duty star & door |
 | `liuren` | Da Liu Ren | A | partial | Jiang-over-hour heaven/earth plate, four lessons (three transmissions left as an interface) |
 | `astrology` | Western Astrology | A | rules | Elements & modalities, aspect orbs, house rulers (planet positions need pyswisseph/upstream) |
 | `physiognomy` | Face & Palm Reading | B | interface | Feature-zone → meaning rule tables (image features extracted by a multimodal model) |
@@ -219,7 +219,7 @@ The gateway exposes `/chat` (engine casts → model interprets → fact cross-ch
 
 - Calendar computation (solar terms, Ganzhi, luck pillars, almanac) relies on the mature pure-Python library `lunar-python==1.4.4`; all divination rules are self-implemented, unit-tested, and auditable.
 - `ziwei` star placement uses commonly-circulated formulas; **leap-month handling differs across schools** — cross-check against professional charting software before production SFT.
-- `qimen` only handles "arrangement given a resolved dun/ju"; solar-term ju resolution (chai-bu / zhi-run / mao-shan) is passed in from above; center-palace lodging in Kun palace 2 is handled.
+- `qimen` ships the mainstream **Chai Bu** ju resolution (24-term ju table + day-pillar fu-tou for the three yuan); manual dun/ju is also accepted. Zhi Run / Mao Shan schools are not built in; center-palace lodging in Kun palace 2 is handled. Calendar correctness is guarded by JDN golden-anchor tests (`tests/test_engine_accuracy.py`).
 - `liuren` covers only up to the four lessons — the three transmissions (nine schools) have many branches; `astrology` ships no ephemeris — install `pyswisseph` and supply positions yourself.
 - `physiognomy` does no pixel recognition; image → structured features is delegated to a multimodal model, the engine only maps "zone → meaning".
 - All output is positioned as **traditional metaphysics cultural reference and entertainment**, with a unified disclaimer. No assertions about disaster, lifespan, or death; not medical, investment, or legal advice.

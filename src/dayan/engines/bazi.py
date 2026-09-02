@@ -88,6 +88,18 @@ def _shensha(day_gan: str, year_zhi: str, day_zhi: str,
                 add("桃花(咸池)", key, z)
             if W.YIMA.get(anchor) == z:
                 add("驿马", key, z)
+            if W.JIANGXING.get(anchor) == z:
+                add("将星", key, z)
+            if W.HUAGAI.get(anchor) == z:
+                add("华盖", key, z)
+            if W.JIESHA.get(anchor) == z:
+                add("劫煞", key, z)
+            if W.WANGSHEN.get(anchor) == z:
+                add("亡神", key, z)
+        if W.GUCHEN.get(year_zhi) == z:
+            add("孤辰", key, z)
+        if W.GUASU.get(year_zhi) == z:
+            add("寡宿", key, z)
     return hits
 
 

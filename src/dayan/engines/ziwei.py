@@ -32,6 +32,9 @@ SIHUA = {
     "壬": ("天梁", "紫微", "左辅", "武曲"),
     "癸": ("破军", "巨门", "太阴", "贪狼")}
 SIHUA_NAME = ["化禄", "化权", "化科", "化忌"]
+# 六吉星与禄存擎羊陀罗（通行口诀）
+LU_CUN = {"甲": "寅", "乙": "卯", "丙": "巳", "戊": "巳", "丁": "午",
+          "己": "午", "庚": "申", "辛": "酉", "壬": "亥", "癸": "子"}
 
 
 def ziwei_pos(day: int, ju: int) -> int:
@@ -74,11 +77,21 @@ def cast_ziwei(year: int, month: int, day: int, hour: int = 12,
         stars[(zw + off) % 12].append(star)
     for star, off in TF_STARS.items():
         stars[(tf + off) % 12].append(star)
+    # 六吉星 + 禄存擎羊陀罗（辅星，单列不与主星混排）
+    aux: Dict[int, list] = {i: [] for i in range(12)}
+    aux[(W.ZHI.index("辰") + lm - 1) % 12].append("左辅")     # 辰起正月顺行
+    aux[(W.ZHI.index("戌") - lm + 1) % 12].append("右弼")     # 戌起正月逆行
+    aux[(W.ZHI.index("戌") - ti) % 12].append("文昌")         # 戌起子时逆数
+    aux[(W.ZHI.index("辰") + ti) % 12].append("文曲")         # 辰起子时顺数
+    lu = W.ZHI.index(LU_CUN[year_gan])
+    aux[lu].append("禄存")
+    aux[(lu + 1) % 12].append("擎羊")                         # 禄前一位
+    aux[(lu - 1) % 12].append("陀罗")                         # 禄后一位
     # 十二人事宫：命宫起顺时针
     palaces = {}
     for k, pname in enumerate(GONG12):
         z = (ming + k) % 12
-        palaces[pname] = {"地支": W.ZHI[z], "主星": stars[z]}
+        palaces[pname] = {"地支": W.ZHI[z], "主星": stars[z], "辅星": aux[z]}
     # 四化
     sihua = {star: SIHUA_NAME[i] for i, star in enumerate(SIHUA[year_gan])}
     # 大限：五行局数起岁，阳男阴女顺，阴男阳女逆
@@ -90,7 +103,7 @@ def cast_ziwei(year: int, month: int, day: int, hour: int = 12,
         step = k if forward else -k
         z = (ming + step) % 12
         dayun.append({"宫": GONG12[k], "地支": W.ZHI[z], "主星": stars[z],
-                      "起岁": ju + k * 10, "止岁": ju + k * 10 + 9})
+                      "辅星": aux[z], "起岁": ju + k * 10, "止岁": ju + k * 10 + 9})
     res = {"命宫": f"{ming_gz}（{W.ZHI[ming]}）", "身宫": W.ZHI[shen],
            "五行局": f"{ju_wx}{ju}局", "紫微在": W.ZHI[zw], "天府在": W.ZHI[tf],
            "生年四化": sihua, "十二宫": palaces, "大限": dayun}
@@ -99,9 +112,10 @@ def cast_ziwei(year: int, month: int, day: int, hour: int = 12,
          f"紫微在{W.ZHI[zw]}、天府在{W.ZHI[tf]}。十四主星落宫："]
     for pname in GONG12:
         p = palaces[pname]
-        if p["主星"]:
+        if p["主星"] or p["辅星"]:
             marks = [s + (f"({sihua[s]})" if s in sihua else "") for s in p["主星"]]
-            L.append(f"  {pname}({p['地支']})：{'、'.join(marks)}")
+            aux_s = f"＋{'、'.join(p['辅星'])}" if p["辅星"] else ""
+            L.append(f"  {pname}({p['地支']})：{'、'.join(marks) or '空宫'}{aux_s}")
         else:
             L.append(f"  {pname}({p['地支']})：空宫")
     L.append("大限" + ("顺行" if forward else "逆行") +

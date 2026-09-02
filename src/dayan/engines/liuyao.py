@@ -30,17 +30,21 @@ def _from_numbers(n1: int, n2: int, n3: int):
           inputs=[InputSpec("lines", "intlist", False, help="六爻自下而上，6/7/8/9"),
                   InputSpec("n1", "int", False), InputSpec("n2", "int", False),
                   InputSpec("n3", "int", False),
-                  InputSpec("day_gan", "str", False, "甲", "起卦日干，安六神")],
-          desc="装卦：纳甲/世应/六亲/六神/变卦（断卦交模型）")
+                  InputSpec("day_gan", "str", False, "甲", "起卦日干，安六神"),
+                  InputSpec("day_ganzhi", "str", False, None, "起卦日干支（如 甲子），供旬空")],
+          desc="装卦：纳甲/世应/六亲/六神/旬空/变卦（断卦交模型）")
 def cast_liuyao(lines: Optional[List[int]] = None, n1: Optional[int] = None,
                 n2: Optional[int] = None, n3: Optional[int] = None,
-                day_gan: str = "甲") -> Dict:
+                day_gan: str = "甲", day_ganzhi: Optional[str] = None) -> Dict:
     if not lines:
         if n1 is None:
             raise ValueError("需提供六爻 lines，或三数 n1,n2,n3")
         lines = _from_numbers(n1, n2, n3 or 1)
     if len(lines) != 6:
         raise ValueError("六爻必须 6 个值")
+    if len(day_ganzhi or "") != 2:
+        day_ganzhi = None                 # 未提供日柱则不做旬空（向后兼容）
+    kongwang = W.xunkong(day_ganzhi[0], day_ganzhi[1]) if day_ganzhi else []
     yang = [v in YANG_VALUE for v in lines]
     dong = [i for i, v in enumerate(lines) if v in DONG_VALUE]
     inv = {tuple(v): k for k, v in G.TRIGRAM_LINES.items()}
@@ -56,20 +60,23 @@ def cast_liuyao(lines: Optional[List[int]] = None, n1: Optional[int] = None,
         nazhi[pos]["is_ying"] = pos == ying
         nazhi[pos]["dong"] = pos in dong
         nazhi[pos]["yao"] = "阳" if yang[pos] else "阴"
+        nazhi[pos]["kongwang"] = bool(kongwang) and nazhi[pos]["zhi"] in kongwang
     bian_name = None
     if dong:
         bian_name, _ = G.bian_gua([1 if y else 0 for y in yang], dong)
     res = {"本卦": gname, "卦宫": f"{palace}宫{G.TRIGRAM_WX[palace]}",
            "世爻": shi + 1, "应爻": ying + 1, "动爻": [d + 1 for d in dong],
-           "变卦": bian_name, "六爻_初到上": nazhi}
+           "变卦": bian_name, "旬空": kongwang, "六爻_初到上": nazhi}
     L = [f"【六爻纳甲】本卦「{gname}」（{res['卦宫']}），世{shi+1}应{ying+1}" +
-         (f"，动爻 {[d+1 for d in dong]}，变卦「{bian_name}」" if dong else "，静卦")]
+         (f"，动爻 {[d+1 for d in dong]}，变卦「{bian_name}」" if dong else "，静卦") +
+         (f"，旬空 {'、'.join(kongwang)}" if kongwang else "")]
     for pos in range(5, -1, -1):
         x = nazhi[pos]
         tags = []
         if x["is_shi"]: tags.append("世")
         if x["is_ying"]: tags.append("应")
         if x["dong"]: tags.append("动")
+        if x["kongwang"]: tags.append("空亡")
         L.append(f"第{pos+1}爻 {x['ganzhi']} {x['yao']} {x['liuishen']} "
                  f"{x['liuqin']}{('【'+'/'.join(tags)+'】') if tags else ''}")
     res["text"] = "\n".join(L)
