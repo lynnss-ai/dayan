@@ -83,7 +83,7 @@ print(chart["text"])
 dayan list                     # 查看全部引擎与入参
 dayan cast <引擎> key=value    # 统一排盘入口（--json 出结构化）
 dayan selftest                 # 16 引擎确定性冒烟
-dayan generate                 # 批量生成 SFT JSONL（--domains/--per-domain/--tool-ratio）
+dayan generate                 # 批量生成 SFT JSONL（--domains/--per-domain/--tool-ratio/--processes）
 dayan probe                    # 留出集对拍：模型答案 vs 引擎真值（--backend echo/openai/mlx）
 dayan report                   # 聚合请求日志出监控日报（--markdown）
 ```

@@ -197,23 +197,49 @@ def build_example(key: str, rng: random.Random, use_tool: bool) -> Dict:
     return {"engine": key, "kind": "tool_call" if use_tool else "direct", "messages": messages}
 
 
+def generate_domain(key: str, per_domain: int, seed: int, val_ratio: float,
+                    tool_ratio: float):
+    """单引擎造数：子种子 = seed + crc32(引擎名)。
+
+    每引擎独立种子 ⇒ 新增引擎不扰动其他引擎的样本，且各引擎可安全并行。
+    """
+    import zlib
+    rng = random.Random(seed + zlib.crc32(key.encode("utf-8")))
+    group = []
+    for _ in range(per_domain):
+        use_tool = rng.random() < tool_ratio
+        ex = build_example(key, rng, use_tool)
+        group.append(ex)
+    rng.shuffle(group)
+    n_v = max(1, int(len(group) * val_ratio)) if group else 0
+    return key, group[:n_v], group[n_v:]
+
+
+def _domain_job(args):
+    """多进程 worker 入口（模块级函数才可 pickle）。"""
+    return generate_domain(*args)
+
+
 def generate(domains: Optional[List[str]] = None, per_domain: int = 40, seed: int = 42,
              val_ratio: float = 0.1, outdir: str = "data",
-             tool_ratio: float = 0.4) -> Tuple[int, int, Dict[str, int]]:
+             tool_ratio: float = 0.4, processes: int = 1) -> Tuple[int, int, Dict[str, int]]:
     domains = domains or list(SAMPLERS.keys())
-    rng = random.Random(seed)
+    jobs = [(k, per_domain, seed, val_ratio, tool_ratio) for k in domains]
+    if processes and processes > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(max_workers=processes) as ex:
+            results = list(ex.map(_domain_job, jobs))
+    else:
+        results = [generate_domain(*j) for j in jobs]
     train, val, count = [], [], {}
-    for key in domains:
-        group = []
-        for _ in range(per_domain):
-            use_tool = rng.random() < tool_ratio
-            ex = build_example(key, rng, use_tool)
+    for key, v, tr in results:
+        for ex in v:
             count[f"{key}:{ex['kind']}"] = count.get(f"{key}:{ex['kind']}", 0) + 1
-            group.append(ex)
-        rng.shuffle(group)
-        n_v = max(1, int(len(group) * val_ratio)) if group else 0
-        val.extend(group[:n_v])
-        train.extend(group[n_v:])
+        val.extend(v)
+        for ex in tr:
+            count[f"{key}:{ex['kind']}"] = count.get(f"{key}:{ex['kind']}", 0) + 1
+        train.extend(tr)
+    rng = random.Random(seed)
     rng.shuffle(train)
     rng.shuffle(val)
     rows = train + val

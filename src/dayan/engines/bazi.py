@@ -135,9 +135,13 @@ def render_bazi(c: Dict) -> str:
     s = c["strength"]
     L.append(f"【旺衰(入门)】月令{s['月令']}处「{s['月令旺衰状态']}」地，"
              f"初步{s['初步强弱']}，喜用倾向：{'、'.join(s['喜用倾向_入门规则']) or '需综合判断'}")
-    du = c["dayun"]
-    L.append(f"【大运】{du['direction']}：" +
-             " → ".join(f"{d['ganzhi']}({d['start_age']}-{d['end_age']}岁)" for d in du["list"]))
+    if c.get("dayun"):
+        du = c["dayun"]
+        L.append(f"【大运】{du['direction']}：" +
+                 " → ".join(f"{d['ganzhi']}({d['start_age']}-{d['end_age']}岁)" for d in du["list"]))
+    if c.get("liunian"):
+        L.append("【流年】" + "；".join(f"{d['year']}年{d['ganzhi']}({d['gan_shishen']})"
+                                   for d in c["liunian"]))
     return "\n".join(L)
 
 
@@ -147,12 +151,14 @@ def render_bazi(c: Dict) -> str:
                   InputSpec("hour", "int", False, 12), InputSpec("minute", "int", False, 0),
                   InputSpec("gender", "str", False, "male"),
                   InputSpec("longitude", "float", False, None),
-                  InputSpec("n_dayun", "int", False, 8),
+                  InputSpec("n_dayun", "int", False, 8, help="大运个数，0 跳过"),
+                  InputSpec("n_liunian", "int", False, 10, help="流年个数，0 跳过"),
                   InputSpec("liunian_from", "int", False, None, "流年起始年，默认出生年")],
           desc="确定性四柱排盘 + 刑冲合害/神煞/大运/流年")
 def cast_bazi(year: int, month: int, day: int, hour: int = 12, minute: int = 0,
               gender: str = "male", longitude: Optional[float] = None,
-              n_dayun: int = 8, liunian_from: Optional[int] = None) -> Dict:
+              n_dayun: int = 8, n_liunian: int = 10,
+              liunian_from: Optional[int] = None) -> Dict:
     subj = Subject(year, month, day, hour, minute, gender, longitude)
     lunar, ec, gcode = to_lunar(subj)
     gz = {"year": ec.getYear(), "month": ec.getMonth(),
@@ -161,16 +167,18 @@ def cast_bazi(year: int, month: int, day: int, hour: int = 12, minute: int = 0,
     pillars = {k: _build_pillar(k, v, day_gan) for k, v in gz.items()}
     wx_count = _wuxing_strength(pillars)
     strength = _day_strength(day_gan, pillars)
-    yun = ec.getYun(gcode)
-    year_yang = W.is_yang_gan(gz["year"][0])
-    forward = (year_yang and gcode == 1) or ((not year_yang) and gcode == 0)
-    dayun_list = [{"ganzhi": d.getGanZhi(), "start_age": d.getStartAge(),
-                   "end_age": d.getEndAge(), "start_year": d.getStartYear(),
-                   "end_year": d.getEndYear()} for d in yun.getDaYun()[1:1 + n_dayun]]
-    dayun = {"direction": "顺行" if forward else "逆行",
-             "start_offset": {"year": yun.getStartYear(), "month": yun.getStartMonth(),
-                              "day": yun.getStartDay()},
-             "start_solar": yun.getStartSolar().toYmd(), "list": dayun_list}
+    dayun = None
+    if n_dayun > 0:                              # 大运走 lunar-python 大运推算，按需跳过
+        yun = ec.getYun(gcode)
+        year_yang = W.is_yang_gan(gz["year"][0])
+        forward = (year_yang and gcode == 1) or ((not year_yang) and gcode == 0)
+        dayun_list = [{"ganzhi": d.getGanZhi(), "start_age": d.getStartAge(),
+                       "end_age": d.getEndAge(), "start_year": d.getStartYear(),
+                       "end_year": d.getEndYear()} for d in yun.getDaYun()[1:1 + n_dayun]]
+        dayun = {"direction": "顺行" if forward else "逆行",
+                 "start_offset": {"year": yun.getStartYear(), "month": yun.getStartMonth(),
+                                  "day": yun.getStartDay()},
+                 "start_solar": yun.getStartSolar().toYmd(), "list": dayun_list}
     gans = [pillars[k]["gan"] for k in PILLAR_ORDER]
     zhis = [pillars[k]["zhi"] for k in PILLAR_ORDER]
     relations = {}
@@ -187,7 +195,7 @@ def cast_bazi(year: int, month: int, day: int, hour: int = 12, minute: int = 0,
         "relations": relations,
         "xunkong": W.xunkong(gz["day"][0], gz["day"][1]),
         "shensha": _shensha(day_gan, gz["year"][1], gz["day"][1], pillars),
-        "liunian": _liunian(day_gan, liunian_from or year, 10),
+        "liunian": _liunian(day_gan, liunian_from or year, n_liunian) if n_liunian > 0 else [],
         "dayun": dayun}
     chart["text"] = render_bazi(chart)
     return chart

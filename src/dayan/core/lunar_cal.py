@@ -2,9 +2,24 @@
 """历法层：统一封装 lunar-python（八字、择日、紫微、梅花时间起卦共用）。"""
 import datetime as dt
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Optional, Tuple
 
-from lunar_python import Solar
+from lunar_python import LunarYear, Solar
+
+# lunar-python 的 LunarYear.fromYear 只缓存最近一个农历年（单槽 __CACHE_YEAR），
+# 排盘跨农历年时会反复重算天文节气/合朔表（每次约 10-15ms）。
+# 这里给类方法挂一层有界 LRU：同一农历年的表整个进程只算一次；
+# LunarYear 实例在库内部本就按只读方式被 Lunar/LunarMonth 复用，跨调用共享安全。
+_ORIG_LUNAR_YEAR_FROM = LunarYear.fromYear
+
+
+@lru_cache(maxsize=512)
+def _cached_lunar_year(lunar_year: int):
+    return _ORIG_LUNAR_YEAR_FROM(lunar_year)
+
+
+LunarYear.fromYear = staticmethod(_cached_lunar_year)
 
 
 @dataclass

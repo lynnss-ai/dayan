@@ -83,7 +83,7 @@ print(chart["text"])
 dayan list                     # List all engines and their inputs
 dayan cast <engine> key=value  # Unified casting entry (--json for structured output)
 dayan selftest                 # Deterministic smoke test of all 16 engines
-dayan generate                 # Batch-generate SFT JSONL (--domains/--per-domain/--tool-ratio)
+dayan generate                 # Batch-generate SFT JSONL (--domains/--per-domain/--tool-ratio/--processes)
 dayan probe                    # Holdout canary: model answers vs engine ground truth (--backend echo/openai/mlx)
 dayan report                   # Aggregate request logs into a daily report (--markdown)
 ```

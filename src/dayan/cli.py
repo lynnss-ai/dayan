@@ -8,6 +8,7 @@
 """
 import argparse
 import json
+import multiprocessing
 import os
 import random
 import sys
@@ -72,11 +73,28 @@ def _cmd_selftest(args) -> int:
     return 0 if ok else 1
 
 
+def _spawn_safe() -> bool:
+    """Windows 下多进程用 spawn，会重导入父进程 __main__。
+    仅当入口是 `python -m dayan.cli`（文件自带 __main__ guard）时可安全多进程；
+    控制台脚本入口（dayan.exe / dayan shell 脚本）在 Windows 上回退串行。"""
+    if os.name != "nt":
+        return True                            # POSIX 默认 fork，无重导入问题
+    main_mod = sys.modules.get("__main__")
+    f = getattr(main_mod, "__file__", "") or ""
+    return os.path.basename(f) == "cli.py"
+
+
 def _cmd_generate(args) -> int:
     domains = args.domains.split(",") if args.domains else None
+    processes = args.processes
+    if processes > 1 and not _spawn_safe():
+        print(f"警告：当前入口不支持多进程（Windows 需 python -m dayan.cli），回退串行",
+              file=sys.stderr)
+        processes = 1
     n_tr, n_va, counts = gen.generate(
         domains=domains, per_domain=args.per_domain, seed=args.seed,
-        val_ratio=args.val_ratio, outdir=args.outdir, tool_ratio=args.tool_ratio)
+        val_ratio=args.val_ratio, outdir=args.outdir, tool_ratio=args.tool_ratio,
+        processes=processes)
     print(f"共生成 train {n_tr} / val {n_va} 条，覆盖 "
           f"{len(set(k.split(':')[0] for k in counts))} 个引擎")
     print("分类计数：", json.dumps(counts, ensure_ascii=False))
@@ -144,6 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--seed", type=int, default=42)
     g.add_argument("--val-ratio", type=float, default=0.1)
     g.add_argument("--tool-ratio", type=float, default=0.4)
+    g.add_argument("--processes", type=int, default=1,
+                   help="并行进程数；>1 时每引擎独立子种子（结果与串行一致），Windows 需 python -m dayan.cli")
     g.add_argument("--outdir", default="data")
     g.set_defaults(func=_cmd_generate)
     pb = sub.add_parser("probe", help="对拍探针：模型答案 vs 规则引擎真值")
@@ -169,6 +189,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    # Windows spawn 子进程重导入入口脚本时会再次执行 main()，直接短路防止递归拉起
+    if multiprocessing.current_process().name != "MainProcess":
+        return 0
     args = build_parser().parse_args(argv)
     return args.func(args)
 
